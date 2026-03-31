@@ -31,7 +31,13 @@
       "Bash(git commit:*)",
       "Bash(git remote:*)",
       "Bash(git branch:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(npm --version)",
+      "Bash(grep -c '\"\"version\"\"' package-lock.json)",
+      "Bash(npm install:*)",
+      "Bash(npm ls:*)",
+      "Bash(python3 -c \":*)",
+      "Bash(python3:*)"
     ]
   }
 }
