@@ -28,7 +28,10 @@
       "Bash(find /Users/masonwoolensack/Desktop/clipflow -type f \\\\\\(-name *.sql -o -name *schema* -o -name *database* \\\\\\))",
       "Bash(git init:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git remote:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)"
     ]
   }
 }
