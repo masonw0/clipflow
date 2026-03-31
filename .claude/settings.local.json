@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm pkg:*)",
+      "Bash(npm run:*)",
+      "Bash(brew install:*)",
+      "Bash(/opt/homebrew/bin/brew install:*)",
+      "Read(//usr/local/bin/**)",
+      "Read(//home/linuxbrew/.linuxbrew/bin/**)",
+      "Read(//usr/**)",
+      "Bash(echo $PATH)",
+      "Bash(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)",
+      "Bash(bash)",
+      "Bash(curl -sL https://api.github.com/repos/supabase/cli/releases/latest)",
+      "Read(//private/tmp/**)",
+      "Bash(curl -L \"https://github.com/supabase/cli/releases/download/v2.78.1/supabase_darwin_arm64.tar.gz\" -o supabase_cli.tar.gz)",
+      "Bash(tar -xzf supabase_cli.tar.gz)",
+      "Bash(cp /tmp/supabase /usr/local/bin/supabase)",
+      "Bash(supabase --version)",
+      "Bash(mkdir -p ~/bin)",
+      "Bash(cp /tmp/supabase ~/bin/supabase)",
+      "Bash(chmod +x ~/bin/supabase)",
+      "Bash(~/bin/supabase --version)",
+      "Bash(~/bin/supabase login:*)",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_4c2a78843e35003c02e57ca2b7cfdff8c54e61b9 ~/bin/supabase link --project-ref epdpyilytoqfszexwayk 2>&1)",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_4c2a78843e35003c02e57ca2b7cfdff8c54e61b9 ~/bin/supabase functions deploy send-notification 2>&1)",
+      "Bash(npx vite:*)",
+      "Bash(find /Users/masonwoolensack/Desktop/clipflow -type f \\\\\\(-name *.sql -o -name *schema* -o -name *database* \\\\\\))",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}
