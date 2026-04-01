@@ -2,10 +2,25 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ClipFlow</title>
-    <style>html,body,#root{background:#000;margin:0;padding:0}</style>
+
+    <!-- PWA manifest (vite-plugin-pwa injects the final path at build time) -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Theme / status bar color -->
+    <meta name="theme-color" content="#000000" />
+
+    <!-- iOS / Safari "Add to Home Screen" PWA support -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="ClipFlow" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+
+    <style>html, body, #root { background: #000; margin: 0; padding: 0; }</style>
   </head>
   <body>
     <div id="root" style="background:#000"></div>
