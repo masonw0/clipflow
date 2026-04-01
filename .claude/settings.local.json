@@ -37,7 +37,11 @@
       "Bash(npm install:*)",
       "Bash(npm ls:*)",
       "Bash(python3 -c \":*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(sudo chown:*)",
+      "Bash(node:*)",
+      "Bash(git -C /Users/masonwoolensack/Desktop/clipflow add vite.config.js index.html src/main.jsx public/icon-192.png public/icon-512.png package.json package-lock.json)",
+      "Bash(git -C:*)"
     ]
   }
 }
