@@ -3650,9 +3650,15 @@ export default function App() {
       return;
     }
 
-    await supabase.functions.invoke("send-notification", {
+    const { data: { session } } = await supabase.auth.getSession();
+    const { data, error } = await supabase.functions.invoke("send-notification", {
+      headers: {
+        Authorization: `Bearer ${session?.access_token}`,
+      },
       body: { to: profile.email, subject, html },
     });
+    if (error) console.error("[sendClipNotificationEmail] edge function error:", error);
+    else console.log("[sendClipNotificationEmail] sent to:", profile.email, "| id:", data?.id);
   };
 
   // Returns video duration string "m:ss" from a File object
