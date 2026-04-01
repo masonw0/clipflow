@@ -1559,7 +1559,7 @@ function ClipperView({ sessions, categories, guidelines, agreement, onSign, curr
 
 // ─── Creator View ─────────────────────────────────────────────────────────────
 
-function CreatorView({ sessions, setSessions, categories, setCategories, guidelines, setGuidelines, agreement, setAgreement, signatures, activity, setActivity, onAddSession, onUpdateClip, onUpdateSessionFootage, onUpdateSessionBrief, workspaceId, teamMembers = [], onRemoveMember, isManager = false, sessionsLoading = false, contentLoading = false, dataLoadError = false, onRetry, sidebarOpen = false, setSidebarOpen = () => {}, isMobile = false, isTablet = false, onSignOut = () => {}, workspaceName = "", creatorWorkspaces = [], currentWorkspaceId = null, onSwitchWorkspace = () => {}, onNewWorkspace = () => {}, jumpTo = null, onJumpHandled = () => {} }) {
+function CreatorView({ sessions, setSessions, categories, setCategories, guidelines, setGuidelines, agreement, setAgreement, signatures, activity, setActivity, onAddSession, onUpdateClip, onUpdateSessionFootage, onUpdateSessionBrief, onDeleteClip, onDeleteSession, workspaceId, teamMembers = [], onRemoveMember, isManager = false, sessionsLoading = false, contentLoading = false, dataLoadError = false, onRetry, sidebarOpen = false, setSidebarOpen = () => {}, isMobile = false, isTablet = false, onSignOut = () => {}, workspaceName = "", creatorWorkspaces = [], currentWorkspaceId = null, onSwitchWorkspace = () => {}, onNewWorkspace = () => {}, jumpTo = null, onJumpHandled = () => {} }) {
   const [tab, setTab] = useState("review");
   const [activeSessionId, setActiveSessionId] = useState(sessions[0]?.id || null);
   const [briefSessionId, setBriefSessionId] = useState(sessions[0]?.id || null);
@@ -1583,6 +1583,11 @@ function CreatorView({ sessions, setSessions, categories, setCategories, guideli
   const commentTsRef = useRef(null); // ref mirror so async addComment always reads latest value
   const videoRef = useRef(null);
   const [downloadProgress, setDownloadProgress] = useState(null); // null | { current, total } | "done"
+  const [deleteClipConfirm, setDeleteClipConfirm] = useState(null); // clip object to confirm deletion
+  const [deleteClipLoading, setDeleteClipLoading] = useState(false);
+  const [deleteSessionConfirm, setDeleteSessionConfirm] = useState(null); // session id to confirm deletion
+  const [deleteSessionLoading, setDeleteSessionLoading] = useState(false);
+  const [hoverSessionId, setHoverSessionId] = useState(null);
 
   // Navigate to a session/clip when jumpTo is set by a notification click
   useEffect(() => {
@@ -1842,6 +1847,75 @@ function CreatorView({ sessions, setSessions, categories, setCategories, guideli
       {showCatManager && <CategoryManager categories={categories} setCategories={handleSetCategories} onClose={() => setShowCatManager(false)} />}
       {showNewSession && <NewSessionModal onClose={() => setShowNewSession(false)} onAdd={addSession} />}
 
+      {/* Delete Clip Confirmation */}
+      {deleteClipConfirm && (
+        <>
+          <div style={{ position: "fixed", inset: 0, zIndex: 499, background: "rgba(0,0,0,0.75)" }} onClick={() => !deleteClipLoading && setDeleteClipConfirm(null)} />
+          <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", zIndex: 500, background: "#0d0d0d", border: "1px solid #2a2a2a", borderRadius: 12, padding: "24px", width: 360, maxWidth: "calc(100vw - 32px)", boxShadow: "0 16px 48px rgba(0,0,0,0.8)" }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: "#e5e5e5", marginBottom: 10 }}>Delete Clip?</div>
+            <div style={{ fontSize: 13, color: "#9ca3af", lineHeight: 1.6, marginBottom: 20 }}>Are you sure? This will permanently delete the clip file and cannot be undone.</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                disabled={deleteClipLoading}
+                onClick={() => setDeleteClipConfirm(null)}
+                style={{ flex: 1, background: "#1a1a1a", border: "1px solid #2a2a2a", color: "#a3a3a3", borderRadius: 7, padding: "9px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+              >Cancel</button>
+              <button
+                disabled={deleteClipLoading}
+                onClick={async () => {
+                  setDeleteClipLoading(true);
+                  try {
+                    await onDeleteClip(deleteClipConfirm.id, deleteClipConfirm.fileUrl);
+                    setSelected(null);
+                    setDeleteClipConfirm(null);
+                  } catch (err) {
+                    console.error("[deleteClip] failed:", err);
+                  } finally {
+                    setDeleteClipLoading(false);
+                  }
+                }}
+                style={{ flex: 1, background: "#ef4444", border: "none", color: "#fff", borderRadius: 7, padding: "9px", fontSize: 13, fontWeight: 700, cursor: deleteClipLoading ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: deleteClipLoading ? 0.6 : 1 }}
+              >{deleteClipLoading ? "Deleting…" : "Delete Clip"}</button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Delete Session Confirmation */}
+      {deleteSessionConfirm && (
+        <>
+          <div style={{ position: "fixed", inset: 0, zIndex: 499, background: "rgba(0,0,0,0.75)" }} onClick={() => !deleteSessionLoading && setDeleteSessionConfirm(null)} />
+          <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", zIndex: 500, background: "#0d0d0d", border: "1px solid #2a2a2a", borderRadius: 12, padding: "24px", width: 360, maxWidth: "calc(100vw - 32px)", boxShadow: "0 16px 48px rgba(0,0,0,0.8)" }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: "#e5e5e5", marginBottom: 10 }}>Delete Session?</div>
+            <div style={{ fontSize: 13, color: "#9ca3af", lineHeight: 1.6, marginBottom: 20 }}>Delete this session? All clips and files in this session will be permanently deleted.</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                disabled={deleteSessionLoading}
+                onClick={() => setDeleteSessionConfirm(null)}
+                style={{ flex: 1, background: "#1a1a1a", border: "1px solid #2a2a2a", color: "#a3a3a3", borderRadius: 7, padding: "9px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+              >Cancel</button>
+              <button
+                disabled={deleteSessionLoading}
+                onClick={async () => {
+                  setDeleteSessionLoading(true);
+                  try {
+                    await onDeleteSession(deleteSessionConfirm);
+                    if (activeSessionId === deleteSessionConfirm) setActiveSessionId(null);
+                    setSelected(null);
+                    setDeleteSessionConfirm(null);
+                  } catch (err) {
+                    console.error("[deleteSession] failed:", err);
+                  } finally {
+                    setDeleteSessionLoading(false);
+                  }
+                }}
+                style={{ flex: 1, background: "#ef4444", border: "none", color: "#fff", borderRadius: 7, padding: "9px", fontSize: 13, fontWeight: 700, cursor: deleteSessionLoading ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: deleteSessionLoading ? 0.6 : 1 }}
+              >{deleteSessionLoading ? "Deleting…" : "Delete Session"}</button>
+            </div>
+          </div>
+        </>
+      )}
+
       <div style={{ display: "flex", height: "calc(100vh - 58px)" }}>
         {/* Sidebar overlay — mobile only */}
         {sidebarOpen && <div className="cf-sidebar-overlay open" onClick={() => setSidebarOpen(false)} />}
@@ -1876,21 +1950,39 @@ function CreatorView({ sessions, setSessions, categories, setCategories, guideli
                   const progress = total > 0 ? Math.round((reviewed / total) * 100) : 0;
                   const active = activeSessionId === s.id;
                   return (
-                    <button key={s.id} onClick={() => { setActiveSessionId(s.id); setSelected(null); setActiveCat("All"); setActiveStatus("All"); setSelectedClips(new Set()); setSidebarOpen(false); }} onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#141414"; }} onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }} style={{ background: active ? "#1f1f1f" : "transparent", border: "none", padding: "10px 20px 12px", cursor: "pointer", textAlign: "left", width: "100%", fontFamily: "inherit", borderLeft: active ? "2px solid #e5e5e5" : "2px solid transparent", transition: "background 0.1s" }}>
-                      <div style={{ fontSize: 11, color: active ? "#ffffff" : "#e5e5e5", fontWeight: 700, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                        <span style={{ fontSize: 10, color: "#9ca3af" }}>{s.date}</span>
-                        {pending > 0
-                          ? <span style={{ background: "#fff", color: "#000", borderRadius: 99, fontSize: 9, fontWeight: 800, padding: "1px 5px" }}>{pending}</span>
-                          : total > 0 ? <span style={{ fontSize: 9, color: "#6b7280", fontWeight: 700 }}>✓ Done</span> : null
-                        }
-                      </div>
-                      {total > 0 && (
-                        <div style={{ height: 3, background: "#1a1a1a", borderRadius: 99, overflow: "hidden" }}>
-                          <div style={{ height: "100%", width: `${progress}%`, background: progress === 100 ? "#22c55e" : "#6b7280", borderRadius: 99, transition: "width 0.3s" }} />
+                    <div
+                      key={s.id}
+                      style={{ position: "relative" }}
+                      onMouseEnter={() => setHoverSessionId(s.id)}
+                      onMouseLeave={() => setHoverSessionId(null)}
+                    >
+                      <button onClick={() => { setActiveSessionId(s.id); setSelected(null); setActiveCat("All"); setActiveStatus("All"); setSelectedClips(new Set()); setSidebarOpen(false); }} onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#141414"; }} onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }} style={{ background: active ? "#1f1f1f" : "transparent", border: "none", padding: "10px 20px 12px", cursor: "pointer", textAlign: "left", width: "100%", fontFamily: "inherit", borderLeft: active ? "2px solid #e5e5e5" : "2px solid transparent", transition: "background 0.1s", paddingRight: hoverSessionId === s.id ? 36 : 20 }}>
+                        <div style={{ fontSize: 11, color: active ? "#ffffff" : "#e5e5e5", fontWeight: 700, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                          <span style={{ fontSize: 10, color: "#9ca3af" }}>{s.date}</span>
+                          {pending > 0
+                            ? <span style={{ background: "#fff", color: "#000", borderRadius: 99, fontSize: 9, fontWeight: 800, padding: "1px 5px" }}>{pending}</span>
+                            : total > 0 ? <span style={{ fontSize: 9, color: "#6b7280", fontWeight: 700 }}>✓ Done</span> : null
+                          }
                         </div>
+                        {total > 0 && (
+                          <div style={{ height: 3, background: "#1a1a1a", borderRadius: 99, overflow: "hidden" }}>
+                            <div style={{ height: "100%", width: `${progress}%`, background: progress === 100 ? "#22c55e" : "#6b7280", borderRadius: 99, transition: "width 0.3s" }} />
+                          </div>
+                        )}
+                      </button>
+                      {hoverSessionId === s.id && (
+                        <button
+                          onClick={e => { e.stopPropagation(); setDeleteSessionConfirm(s.id); }}
+                          title="Delete session"
+                          style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 13, padding: "4px 5px", borderRadius: 5, lineHeight: 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          onMouseEnter={e => { e.currentTarget.style.color = "#ef4444"; e.currentTarget.style.background = "#1a1a1a"; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = "#6b7280"; e.currentTarget.style.background = "none"; }}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                        </button>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -2553,6 +2645,8 @@ function CreatorView({ sessions, setSessions, categories, setCategories, guideli
 
                     <Btn onClick={() => updateClip(selected.id, { status: "discard", revisionNote: "" })} variant="ghost" style={{ width: "100%", padding: "9px", color: "#9ca3af" }}>✕ Discard</Btn>
 
+                    <Btn onClick={() => setDeleteClipConfirm(selected)} variant="ghost" style={{ width: "100%", padding: "9px", color: "#ef4444", borderColor: "#2a1a1a" }}>🗑 Delete Clip</Btn>
+
                     <div style={{ borderTop: "1px solid #2a2a2a", marginTop: 4, paddingTop: 8 }}>
                       <Btn onClick={() => setSelected(null)} variant="ghost" style={{ width: "100%", padding: "9px", textAlign: "center" }}>← Back to clips</Btn>
                     </div>
@@ -2688,6 +2782,9 @@ export default function App() {
   const [creatorWorkspaces, setCreatorWorkspaces] = useState([]);
   const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
   const [showNewWorkspaceModal, setShowNewWorkspaceModal] = useState(false);
+  const [showDeleteWorkspaceModal, setShowDeleteWorkspaceModal] = useState(false);
+  const [deleteWorkspaceInput, setDeleteWorkspaceInput] = useState("");
+  const [deleteWorkspaceLoading, setDeleteWorkspaceLoading] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
@@ -3784,6 +3881,77 @@ export default function App() {
     onProgress(100);
   };
 
+  const handleDeleteClip = async (clipId, fileUrl) => {
+    // Delete storage file
+    if (fileUrl) {
+      const marker = "/object/public/clips/";
+      const idx = fileUrl.indexOf(marker);
+      if (idx !== -1) {
+        const path = decodeURIComponent(fileUrl.slice(idx + marker.length));
+        await supabase.storage.from("clips").remove([path]).catch(console.warn);
+      }
+    }
+    // Delete comments then the clip row
+    await supabase.from("clip_comments").delete().eq("clip_id", clipId);
+    await supabase.from("clips").delete().eq("id", clipId);
+    // Update local state
+    setSessions(prev => prev.map(s => ({ ...s, clips: s.clips.filter(c => c.id !== clipId) })));
+    sessionsRef.current = sessionsRef.current.map(s => ({ ...s, clips: s.clips.filter(c => c.id !== clipId) }));
+  };
+
+  const handleDeleteSession = async (sessionId) => {
+    const { data: clips } = await supabase.from("clips").select("id, file_url").eq("session_id", sessionId);
+    const clipsData = clips || [];
+    // Delete storage files in one batch
+    const paths = clipsData.flatMap(c => {
+      if (!c.file_url) return [];
+      const marker = "/object/public/clips/";
+      const idx = c.file_url.indexOf(marker);
+      return idx !== -1 ? [decodeURIComponent(c.file_url.slice(idx + marker.length))] : [];
+    });
+    if (paths.length > 0) await supabase.storage.from("clips").remove(paths).catch(console.warn);
+    const clipIds = clipsData.map(c => c.id);
+    if (clipIds.length > 0) await supabase.from("clip_comments").delete().in("clip_id", clipIds);
+    await supabase.from("clips").delete().eq("session_id", sessionId);
+    await supabase.from("sessions").delete().eq("id", sessionId);
+    setSessions(prev => prev.filter(s => s.id !== sessionId));
+    sessionsRef.current = sessionsRef.current.filter(s => s.id !== sessionId);
+  };
+
+  const handleDeleteWorkspace = async (wsId) => {
+    const { data: clips } = await supabase.from("clips").select("id, file_url").eq("workspace_id", wsId);
+    const clipsData = clips || [];
+    // Delete all storage files
+    const paths = clipsData.flatMap(c => {
+      if (!c.file_url) return [];
+      const marker = "/object/public/clips/";
+      const idx = c.file_url.indexOf(marker);
+      return idx !== -1 ? [decodeURIComponent(c.file_url.slice(idx + marker.length))] : [];
+    });
+    if (paths.length > 0) await supabase.storage.from("clips").remove(paths).catch(console.warn);
+    const clipIds = clipsData.map(c => c.id);
+    if (clipIds.length > 0) await supabase.from("clip_comments").delete().in("clip_id", clipIds);
+    await supabase.from("clips").delete().eq("workspace_id", wsId);
+    await supabase.from("sessions").delete().eq("workspace_id", wsId);
+    await supabase.from("workspace_members").delete().eq("workspace_id", wsId);
+    await supabase.from("workspace_settings").delete().eq("workspace_id", wsId);
+    await supabase.from("agreements").delete().eq("workspace_id", wsId);
+    await supabase.from("signatures").delete().eq("workspace_id", wsId);
+    await supabase.from("activity").delete().eq("workspace_id", wsId);
+    await supabase.from("workspaces").delete().eq("id", wsId);
+    const remaining = creatorWorkspaces.filter(w => w.id !== wsId);
+    setCreatorWorkspaces(remaining);
+    if (remaining.length > 0) {
+      await switchWorkspace(remaining[0]);
+    } else {
+      setWorkspace(null);
+      workspaceRef.current = null;
+      setSessions([]);
+      sessionsRef.current = [];
+      setShowNewWorkspaceModal(true);
+    }
+  };
+
   const handleRetryLoad = () => {
     const ws = workspaceRef.current;
     if (!ws) return;
@@ -4110,6 +4278,19 @@ export default function App() {
                               <span style={{ width: 14, textAlign: "center", fontSize: 14, flexShrink: 0 }}>+</span>
                               <span>New Workspace</span>
                             </div>
+                            {workspace?.creator_id === user?.id && (
+                              <div
+                                onClick={() => { setDeleteWorkspaceInput(""); setShowDeleteWorkspaceModal(true); setWorkspaceSwitcherOpen(false); }}
+                                style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 6, cursor: "pointer", color: "#ef4444", fontSize: 13, fontWeight: 600, transition: "background 0.1s" }}
+                                onMouseEnter={e => { e.currentTarget.style.background = "#1a0a0a"; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                              >
+                                <span style={{ width: 14, textAlign: "center", fontSize: 13, flexShrink: 0 }}>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                                </span>
+                                <span>Delete Workspace</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </>
@@ -4202,7 +4383,7 @@ export default function App() {
 
       {role === "clipper"
         ? <ClipperView sessions={sessions} categories={categories} guidelines={guidelines} agreement={agreement} onSign={handleSign} currentUserName={userName} currentUserId={user?.id} workspaceId={workspace?.id} onUploadClip={handleUploadClip} onResubmitClip={handleResubmitClip} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} isMobile={isMobile} isTablet={isTablet} onSignOut={handleSignOut} workspaceName={workspace?.name} jumpTo={jumpTo} onJumpHandled={() => setJumpTo(null)} />
-        : <CreatorView sessions={sessions} setSessions={setSessions} categories={categories} setCategories={setCategories} guidelines={guidelines} setGuidelines={handleSetGuidelines} agreement={agreement} setAgreement={handleSetAgreement} signatures={signatures} activity={activity} setActivity={handleSetActivity} onAddSession={handleAddSession} onUpdateClip={handleUpdateClip} onUpdateSessionFootage={handleUpdateSessionFootage} onUpdateSessionBrief={handleUpdateSessionBrief} workspaceId={workspace?.id} teamMembers={teamMembers} onRemoveMember={handleRemoveMember} isManager={role === "manager"} sessionsLoading={sessionsLoading} contentLoading={contentLoading} dataLoadError={dataLoadError} onRetry={handleRetryLoad} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} isMobile={isMobile} isTablet={isTablet} onSignOut={handleSignOut} workspaceName={workspace?.name} creatorWorkspaces={creatorWorkspaces} currentWorkspaceId={workspace?.id} onSwitchWorkspace={(ws) => { switchWorkspace(ws); setSidebarOpen(false); }} onNewWorkspace={() => { setShowNewWorkspaceModal(true); setSidebarOpen(false); }} jumpTo={jumpTo} onJumpHandled={() => setJumpTo(null)} />
+        : <CreatorView sessions={sessions} setSessions={setSessions} categories={categories} setCategories={setCategories} guidelines={guidelines} setGuidelines={handleSetGuidelines} agreement={agreement} setAgreement={handleSetAgreement} signatures={signatures} activity={activity} setActivity={handleSetActivity} onAddSession={handleAddSession} onUpdateClip={handleUpdateClip} onUpdateSessionFootage={handleUpdateSessionFootage} onUpdateSessionBrief={handleUpdateSessionBrief} onDeleteClip={handleDeleteClip} onDeleteSession={handleDeleteSession} workspaceId={workspace?.id} teamMembers={teamMembers} onRemoveMember={handleRemoveMember} isManager={role === "manager"} sessionsLoading={sessionsLoading} contentLoading={contentLoading} dataLoadError={dataLoadError} onRetry={handleRetryLoad} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} isMobile={isMobile} isTablet={isTablet} onSignOut={handleSignOut} workspaceName={workspace?.name} creatorWorkspaces={creatorWorkspaces} currentWorkspaceId={workspace?.id} onSwitchWorkspace={(ws) => { switchWorkspace(ws); setSidebarOpen(false); }} onNewWorkspace={() => { setShowNewWorkspaceModal(true); setSidebarOpen(false); }} jumpTo={jumpTo} onJumpHandled={() => setJumpTo(null)} />
       }
 
       {showNewWorkspaceModal && (
@@ -4210,6 +4391,50 @@ export default function App() {
           onClose={() => setShowNewWorkspaceModal(false)}
           onCreate={handleCreateWorkspace}
         />
+      )}
+
+      {showDeleteWorkspaceModal && workspace && (
+        <>
+          <div style={{ position: "fixed", inset: 0, zIndex: 499, background: "rgba(0,0,0,0.8)" }} onClick={() => !deleteWorkspaceLoading && setShowDeleteWorkspaceModal(false)} />
+          <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", zIndex: 500, background: "#0d0d0d", border: "1px solid #2a2a2a", borderRadius: 12, padding: "28px", width: 420, maxWidth: "calc(100vw - 32px)", boxShadow: "0 16px 48px rgba(0,0,0,0.9)" }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "#ef4444", marginBottom: 8 }}>Delete Workspace</div>
+            <div style={{ fontSize: 13, color: "#9ca3af", lineHeight: 1.65, marginBottom: 20 }}>
+              This will permanently delete <strong style={{ color: "#e5e5e5" }}>{workspace.name}</strong>, all sessions, all clips, and remove all team members. This cannot be undone.
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+              Type <span style={{ color: "#e5e5e5", fontStyle: "normal" }}>{workspace.name}</span> to confirm
+            </div>
+            <input
+              value={deleteWorkspaceInput}
+              onChange={e => setDeleteWorkspaceInput(e.target.value)}
+              placeholder={workspace.name}
+              style={{ width: "100%", background: "#141414", border: "1px solid #2a2a2a", borderRadius: 7, padding: "9px 12px", color: "#e5e5e5", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 16 }}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                disabled={deleteWorkspaceLoading}
+                onClick={() => setShowDeleteWorkspaceModal(false)}
+                style={{ flex: 1, background: "#1a1a1a", border: "1px solid #2a2a2a", color: "#a3a3a3", borderRadius: 7, padding: "10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+              >Cancel</button>
+              <button
+                disabled={deleteWorkspaceLoading || deleteWorkspaceInput !== workspace.name}
+                onClick={async () => {
+                  if (deleteWorkspaceInput !== workspace.name) return;
+                  setDeleteWorkspaceLoading(true);
+                  try {
+                    await handleDeleteWorkspace(workspace.id);
+                    setShowDeleteWorkspaceModal(false);
+                  } catch (err) {
+                    console.error("[deleteWorkspace] failed:", err);
+                  } finally {
+                    setDeleteWorkspaceLoading(false);
+                  }
+                }}
+                style={{ flex: 1, background: deleteWorkspaceInput === workspace.name ? "#ef4444" : "#3a1a1a", border: "none", color: deleteWorkspaceInput === workspace.name ? "#fff" : "#6b7280", borderRadius: 7, padding: "10px", fontSize: 13, fontWeight: 700, cursor: deleteWorkspaceLoading || deleteWorkspaceInput !== workspace.name ? "not-allowed" : "pointer", fontFamily: "inherit", transition: "all 0.15s", opacity: deleteWorkspaceLoading ? 0.6 : 1 }}
+              >{deleteWorkspaceLoading ? "Deleting…" : "Delete Workspace"}</button>
+            </div>
+          </div>
+        </>
       )}
 
       {showOnboarding && workspace && (
