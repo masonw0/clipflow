@@ -41,7 +41,11 @@
       "Bash(sudo chown:*)",
       "Bash(node:*)",
       "Bash(git -C /Users/masonwoolensack/Desktop/clipflow add vite.config.js index.html src/main.jsx public/icon-192.png public/icon-512.png package.json package-lock.json)",
-      "Bash(git -C:*)"
+      "Bash(git -C:*)",
+      "Bash(supabase functions:*)",
+      "Bash(npx supabase:*)",
+      "Read(//opt/homebrew/**)",
+      "Bash(brew list:*)"
     ]
   }
 }
