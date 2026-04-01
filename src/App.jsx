@@ -12,10 +12,12 @@ const INITIAL_AGREEMENT = { enabled: false, title: "Clipper Team Agreement", bod
 
 // ─── Email template ────────────────────────────────────────────────────────────
 
-function buildClipEmail({ clipTitle, isRevision, revisionNote, appUrl }) {
-  const accentColor = isRevision ? "#f97316" : "#ffffff";
-  const label = isRevision ? "Revision Requested" : "Clip Approved";
-  const message = isRevision
+function buildClipEmail({ clipTitle, isRevision, revisionNote, appUrl, isDiscard = false }) {
+  const accentColor = isDiscard ? "#6b7280" : isRevision ? "#f97316" : "#ffffff";
+  const label = isDiscard ? "Clip Not Selected" : isRevision ? "Revision Requested" : "Clip Approved";
+  const message = isDiscard
+    ? "Your creator has reviewed the following clip and decided not to use it."
+    : isRevision
     ? "Your creator has requested changes to the following clip."
     : "Your creator has approved the following clip. Nice work!";
 
@@ -3615,8 +3617,8 @@ export default function App() {
         console.warn("[notif] clipperId is null — cannot notify clipper for clip:", clipId);
       }
 
-      // ── 4. Send email notification for revision and approval ─────────────────
-      if ((updates.status === "finalized" || updates.status === "revision") && clipperId) {
+      // ── 4. Send email notification for all status changes ────────────────────
+      if (clipperId) {
         sendClipNotificationEmail({ clipperId, clipTitle, status: updates.status, revisionNote: updates.revisionNote }).catch(console.error);
       }
     }
@@ -3633,13 +3635,20 @@ export default function App() {
     if (!profile?.email) return;
 
     const appUrl = window.location.origin + window.location.pathname;
-    const isRevision = status === "revision";
 
-    const subject = isRevision
-      ? `Revision requested on "${clipTitle}"`
-      : `Your clip "${clipTitle}" was approved`;
-
-    const html = buildClipEmail({ clipTitle, isRevision, revisionNote, appUrl });
+    let subject, html;
+    if (status === "finalized") {
+      subject = "Your clip was approved";
+      html = buildClipEmail({ clipTitle, isRevision: false, revisionNote: "", appUrl });
+    } else if (status === "revision") {
+      subject = "Revision requested";
+      html = buildClipEmail({ clipTitle, isRevision: true, revisionNote, appUrl });
+    } else if (status === "discard") {
+      subject = "Clip update";
+      html = buildClipEmail({ clipTitle, isRevision: false, revisionNote: "", appUrl, isDiscard: true });
+    } else {
+      return;
+    }
 
     await supabase.functions.invoke("send-notification", {
       body: { to: profile.email, subject, html },
