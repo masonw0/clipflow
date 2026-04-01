@@ -3224,23 +3224,10 @@ export default function App() {
 
       if (ws) {
         await Promise.all([loadSessions(ws.id), loadWorkspaceContent(ws.id)]);
-        // Onboarding: show welcome flow for creators who haven't completed it yet
-        const onboardingKey = `onboarding_complete_${ws.id}`;
-        const onboardingKeyValue = localStorage.getItem(onboardingKey);
-        console.log("[onboarding] effectiveRole:", effectiveRole);
-        console.log("[onboarding] workspace_id:", ws.id);
-        console.log("[onboarding] localStorage key:", onboardingKey);
-        console.log("[onboarding] localStorage value:", onboardingKeyValue);
-        console.log("[onboarding] showOnboarding (before set):", false);
-        if (effectiveRole === "creator") {
-          if (!onboardingKeyValue) {
-            console.log("[onboarding] key not found — setting showOnboarding to true");
-            setShowOnboarding(true);
-          } else {
-            console.log("[onboarding] key found — skipping onboarding");
-          }
-        } else {
-          console.log("[onboarding] role is not creator — skipping onboarding check");
+        // Onboarding: show welcome flow for creators who haven't completed it yet.
+        // We check the DB column (not localStorage) so it persists across devices.
+        if (effectiveRole === "creator" && !ws.onboarding_complete) {
+          setShowOnboarding(true);
         }
       }
     } catch (err) {
@@ -4444,8 +4431,11 @@ export default function App() {
           onSaveName={handleRenameWorkspace}
           onSaveAgreement={handleSetAgreement}
           onSaveGuidelines={handleSetGuidelines}
-          onComplete={() => {
-            localStorage.setItem(`onboarding_complete_${workspace.id}`, "1");
+          onComplete={async () => {
+            await supabase.from("workspaces").update({ onboarding_complete: true }).eq("id", workspace.id);
+            const updated = { ...workspace, onboarding_complete: true };
+            setWorkspace(updated);
+            workspaceRef.current = updated;
             setShowOnboarding(false);
           }}
         />

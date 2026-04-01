@@ -46,6 +46,7 @@ CREATE TABLE workspaces (
   owner_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   logo_url TEXT,
   plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'team', 'enterprise')),
+  onboarding_complete BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
