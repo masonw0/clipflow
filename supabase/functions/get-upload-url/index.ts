@@ -4,6 +4,7 @@ import { AwsClient } from "https://esm.sh/aws4fetch@1.0.19";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 serve(async (req: Request) => {
@@ -18,23 +19,16 @@ serve(async (req: Request) => {
 
   if (!accountId || !accessKeyId || !secretAccessKey) {
     return new Response(JSON.stringify({ error: "R2 credentials not configured" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  let body: { storagePath?: string; contentType?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON" }), {
-      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
-    });
-  }
+  const contentType = req.headers.get("x-content-type") || "video/mp4";
+  const storagePath = req.headers.get("x-storage-path");
 
-  const { storagePath, contentType } = body;
-  if (!storagePath || !contentType) {
-    return new Response(JSON.stringify({ error: "Missing storagePath or contentType" }), {
-      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+  if (!storagePath) {
+    return new Response(JSON.stringify({ error: "Missing x-storage-path header" }), {
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -46,16 +40,24 @@ serve(async (req: Request) => {
   });
 
   const uploadUrl = `https://${accountId}.r2.cloudflarestorage.com/${bucket}/${storagePath}`;
-  const presigned = await aws.sign(
-    new Request(uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": contentType },
-    }),
-    { aws: { signQuery: true } }
-  );
+  const fileData = await req.arrayBuffer();
 
+  const r2Response = await aws.fetch(uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": contentType },
+    body: fileData,
+  });
+
+  if (!r2Response.ok) {
+    const text = await r2Response.text();
+    return new Response(JSON.stringify({ error: "R2 upload failed", details: text }), {
+      status: r2Response.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const publicUrl = `https://media.clipflowstudio.app/${storagePath}`;
   return new Response(
-    JSON.stringify({ presignedUrl: presigned.url }),
+    JSON.stringify({ publicUrl }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 });
