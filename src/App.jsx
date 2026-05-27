@@ -3688,11 +3688,7 @@ export default function App() {
     const storagePath = `${ws.id}/${sessionId}/${Date.now()}.${ext}`;
 
     // ── 2. Upload to R2 via presigned URL ───────────────────────────────────────
-    const accountId = import.meta.env.VITE_R2_ACCOUNT_ID;
-    const accessKeyId = import.meta.env.VITE_R2_ACCESS_KEY_ID;
-    const secretAccessKey = import.meta.env.VITE_R2_SECRET_ACCESS_KEY;
     const bucket = "clipflow-videos";
-    const r2Endpoint = `https://${accountId}.r2.cloudflarestorage.com`;
 
     // Get presigned URL from edge function (keeps secret key server-side)
     const { data: { session: authSession } } = await supabase.auth.getSession();
