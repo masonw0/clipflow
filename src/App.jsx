@@ -3792,6 +3792,8 @@ export default function App() {
     sessionsRef.current = sessionsRef.current.map(s =>
       s.id === sessionId ? { ...s, clips: [...s.clips, newClip] } : s
     );
+  };
+};
   // Resubmits an existing clip: uploads new file, deletes old, updates DB row, logs activity.
   const handleResubmitClip = async ({ file, sessionId, category, title, captions, sound, notes, clipId, oldFileUrl }, onProgress) => {
     const ws = workspaceRef.current;
