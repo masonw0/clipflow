@@ -3676,48 +3676,64 @@ export default function App() {
 
   // Uploads a video file to Supabase Storage via XHR (for real progress events),
   // inserts a clips row, and logs an activity entry.
+// Uploads a video file to Cloudflare R2 via presigned URL (for real progress events),
+  // inserts a clips row, and logs an activity entry.
   const handleUploadClip = async ({ file, sessionId, category, title, captions, sound, notes }, onProgress) => {
     const ws = workspaceRef.current;
     const u = userRef.current;
     if (!ws || !u) throw new Error("Not authenticated");
 
-    // ── 1. Get auth token for the XHR request ──────────────────────────────────
-    const { data: { session: authSession } } = await supabase.auth.getSession();
-    const token = authSession?.access_token;
-    if (!token) throw new Error("No auth token — please sign in again");
-
-    // ── 2. Ensure the "clips" storage bucket exists (no-op if already present) ─
-    await supabase.storage.createBucket("clips", { public: true }).catch(() => {});
-
-    // ── 3. Build the storage path and upload via XHR for progress events ───────
+    // ── 1. Build the storage path ───────────────────────────────────────────────
     const ext = file.name.split(".").pop() || "mp4";
     const storagePath = `${ws.id}/${sessionId}/${Date.now()}.${ext}`;
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+
+    // ── 2. Upload to R2 via presigned URL ───────────────────────────────────────
+    const accountId = import.meta.env.VITE_R2_ACCOUNT_ID;
+    const accessKeyId = import.meta.env.VITE_R2_ACCESS_KEY_ID;
+    const secretAccessKey = import.meta.env.VITE_R2_SECRET_ACCESS_KEY;
+    const bucket = "clipflow-videos";
+    const r2Endpoint = `https://${accountId}.r2.cloudflarestorage.com`;
+
+    // Generate presigned URL using AWS Signature V4
+    const { AwsClient } = await import("aws4fetch");
+    const aws = new AwsClient({
+      accessKeyId,
+      secretAccessKey,
+      service: "s3",
+      region: "auto",
+    });
+
+    const uploadUrl = `${r2Endpoint}/${bucket}/${storagePath}`;
+    const presigned = await aws.sign(
+      new Request(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "video/mp4" },
+      }),
+      { aws: { signQuery: true } }
+    );
 
     await new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 95)); // cap at 95 until DB insert done
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 95));
       };
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) resolve();
-        else reject(new Error(`Storage upload failed (${xhr.status}): ${xhr.responseText}`));
+        else reject(new Error(`R2 upload failed (${xhr.status}): ${xhr.responseText}`));
       };
       xhr.onerror = () => reject(new Error("Network error during upload"));
-      xhr.open("POST", `${supabaseUrl}/storage/v1/object/clips/${storagePath}`);
-      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-      xhr.setRequestHeader("x-upsert", "true");
-      xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
+      xhr.open("PUT", presigned.url);
+      presigned.headers.forEach((value, key) => xhr.setRequestHeader(key, value));
       xhr.send(file);
     });
 
-    // ── 4. Get public URL ───────────────────────────────────────────────────────
-    const { data: { publicUrl } } = supabase.storage.from("clips").getPublicUrl(storagePath);
+    // ── 3. Build public URL ─────────────────────────────────────────────────────
+    const publicUrl = `https://${accountId}.r2.cloudflarestorage.com/${bucket}/${storagePath}`;
 
-    // ── 5. Get video duration from the file ────────────────────────────────────
+    // ── 4. Get video duration from the file ────────────────────────────────────
     const duration = await getVideoDuration(file);
 
-    // ── 6. Insert clip row ─────────────────────────────────────────────────────
+    // ── 5. Insert clip row ─────────────────────────────────────────────────────
     const { data: clipData, error: clipError } = await supabase.from("clips").insert({
       session_id: sessionId,
       workspace_id: ws.id,
@@ -3735,7 +3751,7 @@ export default function App() {
 
     if (clipError) throw new Error(`Failed to save clip: ${clipError.message}`);
 
-    // ── 7. Insert activity entry ────────────────────────────────────────────────
+    // ── 6. Insert activity entry ────────────────────────────────────────────────
     const sessionTitle = sessionsRef.current.find(s => s.id === sessionId)?.title || "";
     await supabase.from("activity").insert({
       workspace_id: ws.id,
@@ -3744,7 +3760,7 @@ export default function App() {
       session_title: sessionTitle,
     });
 
-    // Notify the workspace creator (not if the creator is uploading themselves)
+    // Notify the workspace creator
     console.log("[notif] upload — ws.creator_id:", ws.creator_id, "| uploader u.id:", u.id, "| clipData.id:", clipData.id);
     if (ws.creator_id && ws.creator_id !== u.id) {
       console.log("[notif] sending creator upload notification");
@@ -3753,7 +3769,7 @@ export default function App() {
       console.warn("[notif] upload notification skipped — creator_id missing or uploader is the creator:", { creator_id: ws.creator_id, uploader: u.id });
     }
 
-    // ── 8. Update local sessions state ─────────────────────────────────────────
+    // ── 7. Update local sessions state ─────────────────────────────────────────
     const newClip = {
       id: clipData.id,
       title: clipData.title,
@@ -3776,10 +3792,6 @@ export default function App() {
     sessionsRef.current = sessionsRef.current.map(s =>
       s.id === sessionId ? { ...s, clips: [...s.clips, newClip] } : s
     );
-
-    onProgress(100);
-  };
-
   // Resubmits an existing clip: uploads new file, deletes old, updates DB row, logs activity.
   const handleResubmitClip = async ({ file, sessionId, category, title, captions, sound, notes, clipId, oldFileUrl }, onProgress) => {
     const ws = workspaceRef.current;
