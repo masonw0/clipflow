@@ -3694,14 +3694,14 @@ export default function App() {
     const bucket = "clipflow-videos";
     const r2Endpoint = `https://${accountId}.r2.cloudflarestorage.com`;
 
-    // Generate presigned URL using AWS Signature V4
-    const { AwsClient } = await import("aws4fetch");
-    const aws = new AwsClient({
-      accessKeyId,
-      secretAccessKey,
-      service: "s3",
-      region: "auto",
+    // Get presigned URL from edge function (keeps secret key server-side)
+    const { data: { session: authSession } } = await supabase.auth.getSession();
+    const { data: urlData, error: urlError } = await supabase.functions.invoke("get-upload-url", {
+      headers: { Authorization: `Bearer ${authSession?.access_token}` },
+      body: { storagePath, contentType: file.type || "video/mp4" },
     });
+    if (urlError || !urlData?.presignedUrl) throw new Error("Failed to get upload URL");
+    const presignedUrl = urlData.presignedUrl;
 
     const uploadUrl = `${r2Endpoint}/${bucket}/${storagePath}`;
     const presigned = await aws.sign(
@@ -3722,8 +3722,7 @@ export default function App() {
         else reject(new Error(`R2 upload failed (${xhr.status}): ${xhr.responseText}`));
       };
       xhr.onerror = () => reject(new Error("Network error during upload"));
-      xhr.open("PUT", presigned.url);
-      presigned.headers.forEach((value, key) => xhr.setRequestHeader(key, value));
+      xhr.open("PUT", presignedUrl);
       xhr.send(file);
     });
 
