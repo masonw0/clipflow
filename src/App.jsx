@@ -3699,15 +3699,6 @@ export default function App() {
     if (urlError || !urlData?.presignedUrl) throw new Error("Failed to get upload URL");
     const presignedUrl = urlData.presignedUrl;
 
-    const uploadUrl = `${r2Endpoint}/${bucket}/${storagePath}`;
-    const presigned = await aws.sign(
-      new Request(uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type || "video/mp4" },
-      }),
-      { aws: { signQuery: true } }
-    );
-
     await new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.upload.onprogress = (e) => {
