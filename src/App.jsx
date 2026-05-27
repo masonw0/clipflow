@@ -3690,29 +3690,31 @@ export default function App() {
     // ── 2. Upload to R2 via presigned URL ───────────────────────────────────────
     const bucket = "clipflow-videos";
 
-    // ── 2. Upload file through edge function to R2 ──────────────────────────
+    // ── 2. Get presigned URL from edge function ────────────────────────────
     const { data: { session: authSession } } = await supabase.auth.getSession();
-    const uploadResponse = await fetch(
-      `https://epdpyilytoqfszexwayk.supabase.co/functions/v1/get-upload-url`,
-      {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${authSession?.access_token}`,
-          "x-storage-path": storagePath,
-          "x-content-type": file.type || "video/mp4",
-        },
-        body: file,
-      }
-    );
+    const { data: urlData, error: urlError } = await supabase.functions.invoke("get-upload-url", {
+      headers: { Authorization: `Bearer ${authSession?.access_token}` },
+      body: { storagePath, contentType: file.type || "video/mp4" },
+    });
+    if (urlError || !urlData?.presignedUrl) throw new Error("Failed to get upload URL");
+    const presignedUrl = urlData.presignedUrl;
 
-    onProgress(90);
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 95));
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) resolve();
+        else reject(new Error(`R2 upload failed (${xhr.status}): ${xhr.responseText}`));
+      };
+      xhr.onerror = () => reject(new Error("Network error during upload"));
+      xhr.open("PUT", presignedUrl);
+      xhr.send(file);
+    });
 
-    if (!uploadResponse.ok) {
-      const err = await uploadResponse.json().catch(() => ({}));
-      throw new Error(err.error || `Upload failed: ${uploadResponse.status}`);
-    }
-
-    const { publicUrl } = await uploadResponse.json();
+    // ── 3. Build public URL ─────────────────────────────────────────────────────
+    const publicUrl = `https://media.clipflowstudio.app/${storagePath}`;
 
     // ── 4. Get video duration from the file ────────────────────────────────────
     const duration = await getVideoDuration(file);

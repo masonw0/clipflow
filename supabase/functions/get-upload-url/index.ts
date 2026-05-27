@@ -4,7 +4,6 @@ import { AwsClient } from "https://esm.sh/aws4fetch@1.0.19";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 serve(async (req: Request) => {
@@ -23,11 +22,18 @@ serve(async (req: Request) => {
     });
   }
 
-  const contentType = req.headers.get("x-content-type") || "video/mp4";
-  const storagePath = req.headers.get("x-storage-path");
+  let body: { storagePath?: string; contentType?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
-  if (!storagePath) {
-    return new Response(JSON.stringify({ error: "Missing x-storage-path header" }), {
+  const { storagePath, contentType } = body;
+  if (!storagePath || !contentType) {
+    return new Response(JSON.stringify({ error: "Missing storagePath or contentType" }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -40,24 +46,16 @@ serve(async (req: Request) => {
   });
 
   const uploadUrl = `https://${accountId}.r2.cloudflarestorage.com/${bucket}/${storagePath}`;
-  const fileData = await req.arrayBuffer();
+  const presigned = await aws.sign(
+    new Request(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": contentType },
+    }),
+    { aws: { signQuery: true } }
+  );
 
-  const r2Response = await aws.fetch(uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": contentType },
-    body: fileData,
-  });
-
-  if (!r2Response.ok) {
-    const text = await r2Response.text();
-    return new Response(JSON.stringify({ error: "R2 upload failed", details: text }), {
-      status: r2Response.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-
-  const publicUrl = `https://media.clipflowstudio.app/${storagePath}`;
   return new Response(
-    JSON.stringify({ publicUrl }),
+    JSON.stringify({ presignedUrl: presigned.url }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 });
