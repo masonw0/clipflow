@@ -3727,7 +3727,7 @@ export default function App() {
     });
 
     // ── 3. Build public URL ─────────────────────────────────────────────────────
-    const publicUrl = `https://${accountId}.r2.cloudflarestorage.com/${bucket}/${storagePath}`;
+    const publicUrl = `https://media.clipflowstudio.app/${storagePath}`;
 
     // ── 4. Get video duration from the file ────────────────────────────────────
     const duration = await getVideoDuration(file);
